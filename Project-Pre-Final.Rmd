@@ -1,0 +1,899 @@
+---
+title: "Project Pre-Final-1"
+author: "Arthur Rincon de Freitas, Nilufar Nosirjonova"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# **Project Update 4**
+## **Students:**
+## Arthur
+## Nilufar
+
+
+# Data Exploration, Cleaning, Tranformation
+
+# Libraries used:
+
+```{r}
+library (skimr)
+library (dplyr)
+library (ggplot2)
+library (reshape2)
+library (fastDummies)
+library (data.table)
+library (plyr)
+library (stringr)
+library (lubridate)
+library (caret)
+library (nnet)
+library (lattice)
+library (gplots)
+library (GGally)
+library (MASS)
+library (pROC)
+library (e1071)
+library (FNN)
+library (gains)
+library (boot)
+library (rpart)
+```
+
+
+## Load the data
+
+```{r}
+# Load data
+project <- read.csv("D:/Mercer - Activities and Courses/BDA - 620 - Data Mining/Team Project/Data/2019-Dec.csv")
+head(project,10)
+View(project)
+```
+
+```{r}
+# See Information
+
+summary(project)
+```
+
+```{r}
+skim(project)
+```
+
+```{r}
+# List of Names of current variables
+
+t(t(names(project)))
+```
+
+
+## Data Cleaning
+
+```{r}
+# Filling missing values with
+
+project[project == ""]<- NA
+```
+
+```{r}
+# Project without category code
+
+project$category_code <- NULL
+```
+
+```{r}
+# Normalized price
+
+project$log_price <- log(project$price)
+```
+
+
+```{r}
+# Number of missing values
+
+colSums(is.na(project))
+
+# It can be compared to what we see in skim function
+```
+
+```{r}
+# Remove missing values
+
+project <- subset(project, complete.cases(project))
+```
+
+```{r}
+# Remove duplicates
+
+project<- unique(project)
+```
+
+```{r}
+# Number of missing values 2
+
+colSums(is.na(project))
+
+# It can be compared to the first missing values check 
+```
+
+```{r}
+# Identify outliers using Tukey's method
+
+q1 <- quantile(project$price, 0.25)
+
+q3 <- quantile(project$price, 0.75)
+
+iqr <- q3 - q1
+
+outliers <- which(project$price < q1 - 1.5 * iqr | project$price > q3 + 1.5 * iqr)
+```
+
+```{r}
+# Boxplot for outliers
+
+
+boxplot(project$price ~ project$event_type, col = c("darkblue", "orange", "darkred", 'darkgreen'), ylab = "Price", xlab = "Event Type")
+```
+
+
+```{r}
+# With Normalized data
+
+boxplot(project$log_price ~ project$event_type, col = c("darkblue", "orange", "darkred", 'darkgreen'), ylab = "Price", xlab = "Event Type")
+```
+
+
+```{r}
+# Removing outliers
+
+project <- project[-outliers, ]
+
+```
+
+
+```{r}
+# Boxplot without outliers
+boxplot(project$price ~ project$event_type, col = c("darkblue", "orange", "darkred", 'darkgreen'), ylab = "Price", xlab = "Event Type")
+
+```
+
+
+## Transform the appropriate variables
+
+```{r}
+summary(project)
+```
+
+```{r}
+str(project)
+```
+
+```{r}
+# Dummy variables of event_type
+
+dummies_events <- model.matrix(~event_type + 0, data = project)
+
+dummies_events <- as.data.frame(dummies_events)
+
+project<- cbind(project,dummies_events)
+```
+
+
+```{r}
+# Making days and times 
+
+project$event_time <- as.POSIXct(project$event_time, format = "%Y-%m-%d %H:%M:%S")
+
+
+## Extract the time of day
+
+project$time_of_day <- format(project$event_time, "%H")
+
+
+## Create days 
+
+project$days_of_week <- format(project$event_time, "%A")
+
+
+## Creating period of the day
+
+project$period_of_day <- cut(as.numeric(substr(project$time_of_day,1,2)),
+                   breaks=c(-Inf, 6, 12, 18, Inf),
+                   labels=c("Morning","Late Morning","Afternoon","Evening"))
+
+
+## Creating day of the Month variable
+
+project$day_of_month <- day(project$event_time)
+```
+
+```{r}
+
+project$days_of_week <- factor(project$days_of_week, levels =c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
+
+project$period_of_day<- factor(project$period_of_day, levels = c("Morning", "Late Morning", "Afternoon", "Evening"))
+```
+
+```{r}
+# Creating weeks 
+
+project$weeks <- week(project$event_time)
+
+project$weeks <-project$weeks - 47
+
+project$weeks <- as.factor(project$weeks)
+```
+
+```{r}
+# Group brands
+
+brand_groups <- cut(project$price,breaks = c(0, 5, 10, 16),
+                                                  labels = c("Cheap", "Medium", "Expensive"))
+```
+
+
+```{r}
+# Transforming the variable types
+
+project$product_id <- as.character(project$product_id)
+
+project$category_id <- factor(project$category_id)
+
+project$user_id <- as.character(project$user_id)
+
+project$brand <- factor(project$brand)
+
+project$day_of_month <- as.numeric(project$day_of_month)
+
+project$time_of_day <- as.numeric(project$time_of_day)
+```
+
+
+```{r}
+# Combine the brand_groups into a new data frame
+
+brand_group <- data.frame(brand_groups)
+
+project<- cbind(project, brand_group)
+```
+
+
+```{r}
+str(project)
+```
+
+```{r}
+summary(project)
+```
+
+
+```{r}
+skim(project)
+```
+
+# Missing Values 3
+
+```{r}
+colSums(is.na(project))
+```
+
+```{r}
+# Removing missing Values 3
+
+project <- subset(project, complete.cases(project))
+```
+
+```{r}
+
+colSums(is.na(project))
+```
+
+```{r}
+# Histograms
+
+par(mfrow = c(1,3))
+
+hist(project$price, col = 'darkblue', main = "Price", xlab = "Price")
+
+# hist(project$log_price, col = 'darkblue', main = "log of price")
+
+hist(project$time_of_day, col = "navy", main = "Time of day", xlab = "Time of Day")
+
+hist(project$day_of_month, col = "navy", main = "Day of Month", xlab = "Day of Month" )
+
+```
+## Boxplots
+
+```{r}
+# Boxplots
+
+par(mfrow = c(1,2))
+
+boxplot(price ~ event_type, data = project, col = c("navy", "orange", "darkred", "darkgreen"),ylab = "Price", xlab = "Event Type")
+
+boxplot(price ~ brand_groups, data = project, col = c("brown", "gray", "gold"), ylab = "Price", xlab = "Brands Price Level") 
+
+boxplot(time_of_day ~ brand_groups, data = project, col = c("brown", "gray", "gold"), ylab = "Time of Day", xlab = "Brand Price Level")
+
+boxplot(day_of_month ~ brand_groups, data = project, col = c("brown", "gray", "gold"), ylab = "Day of the Month", xlab = "Brands Price Level")
+
+```
+
+```{r}
+# Bar charts
+
+par(mfrow = c(2,3))
+
+barplot(table(project$event_type), col = c("navy", "orange", "darkred", "darkgreen"), ylab = "Occurrences", xlab = "Event Type")
+
+barplot(table(project$brand_groups), col = c("brown", "gray", "gold"), ylab = "Occurrences", xlab = "Brands price level")
+
+barplot(table(project$days_of_week), col = "gold3", ylab = "Occurrences", xlab = " Days of the week")
+
+barplot(table(project$period_of_day), col = "gold3", ylab = "Occurrences", xlab = "Period of Day")
+
+barplot(table(project$weeks), col = "gold3", ylab = "Occurrences", xlab = "Weeks")
+
+```
+
+```{r}
+# Plots
+
+par(mfrow = c(1,4))
+
+barplot(table(project$day_of_month[project$event_typepurchase == 1]), 
+        main = "Number of Purchases by Day of Month",
+        xlab = "Day of Month",
+        ylab = "Count",
+        col = "gold3")
+
+barplot(table(project$day_of_month[project$event_typeremove_from_cart == 1]), 
+        main = "Number of Removals by Day of Month",
+        xlab = "Day of Month",
+        ylab = "Count",
+        col = "red4")
+
+
+barplot(table(project$time_of_day[project$event_typepurchase == 1]), 
+        main = "Number of Purchases by Time of day",
+        xlab = "Time of Day",
+        ylab = "Count",
+        col = "gold3")
+
+barplot(table(project$time_of_day[project$event_typeremove_from_cart == 1]), 
+        main = "Number of Removals by time of day",
+        xlab = "Time of Day",
+        ylab = "Count",
+        col = "red4")
+```
+
+
+```{r}
+par(mfrow = c(1,4))
+barplot(table(project$weeks[project$event_typepurchase == 1]), 
+        main = "Number of Purchases by Weeks",
+        xlab = "Weeks",
+        ylab = "Count",
+        col = "gold3")
+
+barplot(table(project$weeks[project$event_typeremove_from_cart == 1]), 
+        main = "Number of Removals by Weeks",
+        xlab = "Weeks",
+        ylab = "Count",
+        col = "red4")
+
+barplot(table(project$brand_groups[project$event_typepurchase == 1]), 
+        main = "Number of Purchases by Brand Groups",
+        xlab = "Brand Groups",
+        ylab = "Count",
+        col = "gold3")
+
+barplot(table(project$brand_groups[project$event_typeremove_from_cart == 1]), 
+        main = "Number of Removals by Brand Groups",
+        xlab = "Brand Groups",
+        ylab = "Count",
+        col = "red4")
+
+```
+
+
+
+
+```{r}
+par(mfrow = c(2,3))
+
+barplot(table(project$time_of_day), col = "navy", main = "Time of Day", ylab = "Occurrences", xlab = "Time of day")
+
+barplot(table(project$days_of_week), col = "darkred", main = "Days of Week", ylab = "Occurrences", xlab = "Days of Weeks")
+
+barplot(table(project$day_of_month), col = "darkgreen", main = "Day of Month", ylab = "Occurrences", xlab = "Day of Month")
+
+barplot(table(project$period_of_day), col = "gold4", main = "Periods of Day", ylab = "Occurrences", xlab = "Periods of Day")
+
+barplot(table(project$weeks), col = "purple4", main = "weeks", ylab = "Occurrences", xlab = "Weeks")
+
+```
+
+
+```{r}
+par(mfrow = c(1,4))
+
+barplot(table(project$event_typeview), col = "darkgreen", main = "view")
+
+barplot(table(project$event_typecart), col = "navy", main = "Cart")
+
+barplot(table(project$event_typepurchase), col = "orange4", main = "Purchase")
+
+barplot(table(project$event_typeremove_from_cart), col = "darkred", main = "Remove from cart")
+```
+
+
+```{r}
+par(mfrow = c(1,4))
+
+# calculate the proportion of each event type
+
+view_prop <- prop.table(table(project$event_typeview)) * 100
+cart_prop <- prop.table(table(project$event_typecart)) * 100
+purchase_prop <- prop.table(table(project$event_typepurchase)) * 100
+remove_prop <- prop.table(table(project$event_typeremove_from_cart)) * 100
+
+# create barplots with y-axis in percentages
+barplot(cart_prop, ylim = c(0, max(cart_prop)), col = "navy", ylab = "Percentage", main = "Cart")
+text(x = 1:length(cart_prop), y = cart_prop+2, labels = paste0(round(cart_prop,1), "%"), pos = 3)
+barplot(purchase_prop, ylim = c(0, max(purchase_prop)), col = "orange", ylab = "Percentage", main = "Purchase")
+text(x = 1:length(purchase_prop), y = purchase_prop+2, labels = paste0(round(purchase_prop,1), "%"), pos = 3)
+barplot(remove_prop, ylim = c(0, max(remove_prop)), col = "darkred", ylab = "Percentage", main = "Remove from Cart")
+text(x = 1:length(remove_prop), y = remove_prop+2, labels = paste0(round(remove_prop,1), "%"), pos = 3)
+
+
+
+```
+
+
+```{r}
+ggplot(project, aes(x=event_type, y=price , fill = event_type)) + geom_boxplot() + scale_fill_manual(values=c("darkblue", "orange", "darkred", "darkgreen"))
+```
+
+## Correlation Matrix
+
+```{r}
+# Correlation Matrix
+
+cor.mat <- cor(project[, c("price", "log_price", "event_typecart", "event_typepurchase", "event_typeremove_from_cart", "event_typeview", "time_of_day", "day_of_month")])
+
+heatmap.2(cor.mat,
+          Rowv = FALSE,
+          Colv = FALSE,
+          dendrogram = 'none',
+          cellnote = round(cor(project[, c("price", "log_price", "event_typecart", "event_typepurchase", "event_typeremove_from_cart", "event_typeview", "time_of_day", "day_of_month")]), 2),
+          notecol = 'white',
+          key = FALSE,
+          trace = 'none',
+          margins = c(10,10),
+          col = colorRampPalette(c("lightblue", "navy"))(100),
+          cexRow = 0.8, # adjust font size of row labels
+          cexCol = 0.8) # adjust font size of column labels)
+
+```
+
+
+
+
+
+```{r}
+cor.mat <- cor(project[, c("price", "log_price", "event_typecart", "event_typepurchase", "event_typeremove_from_cart", "event_typeview", "time_of_day", "day_of_month")])
+
+melted.cor.mat <- melt(cor.mat)
+
+ggplot(melted.cor.mat, aes(x = Var1, y = Var2, fill = value)) + 
+  geom_tile() +
+  geom_text(aes(x=Var1, y=Var2, label = round(value,3))) 
+
+
+```
+
+```{r}
+str(project)
+```
+
+## Partitioning the data
+
+
+```{r}
+# Partition train data with 60%
+
+set.seed(123)
+
+train.rows <- sample(rownames(project), dim(project)[1]*0.60, replace = FALSE)
+
+train_data <- project[train.rows, ]
+
+table(train_data$event_typepurchase)
+
+
+# Create validation with 40% 
+
+valid.rows <- setdiff(rownames(project), train.rows)
+
+valid_data <- project[valid.rows, ]
+
+table(valid_data$event_typepurchase)
+```
+
+## Balancing the Data
+
+```{r}
+# make train_data balanced
+
+train_data$event_typepurchase <- as.factor(train_data$event_typepurchase)
+
+train_balanced <- downSample(x = data.frame(train_data), y = train_data$event_typepurchase, yname = "event_typepurchase")
+
+#check categories balanced
+
+table(train_balanced$event_typepurchase)
+```
+
+```{r}
+# Calculate the distribution of categories in the validation set
+
+category_counts <- table(valid_data$event_typepurchase)
+
+
+# Find the category with the lowest frequency
+
+min_freq <- min(category_counts)
+
+
+# Initialize a list to store the sampled rows
+
+valid_balanced <- list()
+
+
+# For each category, sample an equal number of rows to achieve balance
+
+for (category in names(category_counts)) {
+  category_indices <- which(valid_data$event_typepurchase == category)
+  valid_balanced[[category]] <- valid_data[category_indices[1:17899], ]
+}
+
+
+# Combine the sampled rows for all categories
+
+valid_balanced <- do.call(rbind, valid_balanced)
+
+# Shuffle the rows to avoid any bias
+
+valid_balanced<- valid_balanced[sample(nrow(valid_balanced)), ]
+
+# Use the table function to check the distribution of categories in the balanced dataset
+
+table(valid_balanced$event_typepurchase)
+```
+
+## Models
+
+### Logistic Model
+
+```{r}
+str(project)
+```
+
+
+```{r}
+# Logistic Model Final
+
+log.model_4 <- glm(event_typepurchase ~ price + event_typecart + time_of_day + days_of_week + day_of_month + brand_groups, data = train_balanced,  family = binomial, na.action = na.exclude) 
+
+summary(log.model_4)
+```
+
+```{r}
+# Prediction model in validation dataset
+
+pred_train_4 <- predict(log.model_4, na.action = na.exclude)
+
+pred_valid_4 <- predict(log.model_4, newdata = valid_balanced, type = "response", na.action = na.pass)
+
+```
+
+```{r}
+# Convert predicted values to binary predictions (0 or 1)
+predicted_4 <- ifelse(pred_valid_4 > 0.5, 1, 0)
+
+# Subset the true values to the same length as pred
+actual_4 <- valid_balanced$event_typepurchase[1:length(predicted_4)]
+
+df_4 <- data.frame(predicted_4, actual_4)
+
+
+# Generate confusion matrix using table() function
+
+table(df_4$predicted_4, df_4$actual_4)
+```
+
+```{r}
+cm_4 <- confusionMatrix(factor(predicted_4, levels = c(1, 0)),
+                      factor(actual_4, levels = c(1, 0)))
+cm_4
+
+```
+
+```{r}
+# Generate example data
+
+set.seed(123)
+
+
+# Calculate ROC curve
+
+roc_obj_log_4 <- roc(as.numeric(df_4$actual_4), as.numeric(df_4$predicted_4))
+
+
+
+# Plot ROC curve
+
+plot(roc_obj_log_4, main = "Roc Curve")
+
+```
+
+```{r}
+lift_log_4 <- lift(relevel(as.factor(actual_4), ref = "1") ~ predicted_4, data = df_4)
+
+xyplot(lift_log_4, plot = "gain")
+
+```
+```{r}
+# Cross-Validation Results
+cv_results_ml_4 <- cv.glm(data = train_balanced, glmfit = log.model_4, K = 10)
+
+
+print(cv_results_ml_4)
+```
+
+
+## Naive Bayes
+
+
+
+
+```{r}
+# Create Naive Model Final
+
+naive.model_3 <- naiveBayes(event_typepurchase ~ event_typecart + price + brand_groups + days_of_week + period_of_day + weeks , na.action = na.pass, data=train_balanced)
+
+naive.model_3
+```
+
+```{r}
+#predict probability
+
+pred_naive_3 <- predict(naive.model_3, newdata = valid_balanced)
+```
+
+```{r}
+predicted_naive_3 <- ifelse(pred_naive_3 > 0.6, 1, 0)
+
+# Subset the true values to the same length as pred
+
+actual_naive_3 <- as.factor(factor(valid_balanced$event_typepurchase[1:length(predicted_naive_3)]))
+
+predicted_naive_3 <- as.factor(factor(pred_naive_3)) 
+
+
+```
+
+
+```{r}
+# Define the levels you want
+
+
+# Create the confusion matrix
+confusionMatrix(actual_naive_3, predicted_naive_3)
+
+```
+
+```{r}
+# Generate example data
+
+set.seed(123)
+
+
+# Calculate ROC curve
+
+roc_obj_naive_3 <- roc(as.numeric(actual_naive_3), as.numeric(predicted_naive_3))
+
+
+# Plot ROC curve
+
+plot(roc_obj_naive_3, main = "ROC Curve")
+
+```
+
+```{r}
+lift_naive_3 <- lift(relevel(as.factor(actual_naive_3), ref = "1") ~ predicted_naive_3, data = naive.model_3)
+
+xyplot(lift_naive_3, plot = "gain")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
